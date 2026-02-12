@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Authenticity Scanner | AI-Powered Verification</title>
+    <meta name="description" content="AI-powered document authenticity detection. Verify if documents are genuine, AI-generated, or manipulated.">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Background Effects -->
+    <div class="bg-grain"></div>
+    <div class="bg-gradient"></div>
+    
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="2" width="28" height="28" rx="6" stroke="currentColor" stroke-width="2"/>
+                    <path d="M16 8L16 24M10 16L22 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <circle cx="16" cy="16" r="3" fill="currentColor"/>
+                </svg>
+                <span>DocAuth<span class="accent">AI</span></span>
+            </div>
+            <div class="header-status">
+                <span class="status-dot"></span>
+                <span class="status-text">System Online</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section" id="uploadSection">
+                <div class="section-header">
+                    <h1 class="title">Document Authenticity Scanner</h1>
+                    <p class="subtitle">AI-powered verification for PDFs and images. Detect AI-generated content, manipulation, and verify authenticity.</p>
+                </div>
+
+                <div class="upload-zone" id="uploadZone">
+                    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp" hidden>
+                    
+                    <div class="upload-icon">
+                        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="12" y="16" width="40" height="44" rx="4" stroke="currentColor" stroke-width="2"/>
+                            <path d="M24 28L32 20L40 28M32 20V42" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M20 52H44" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    
+                    <div class="upload-text">
+                        <h3>Drop document here or click to browse</h3>
+                        <p>Supported formats: PDF, JPG, PNG, WEBP</p>
+                        <p class="file-limit">Maximum size: 10MB</p>
+                    </div>
+                    
+                    <button class="btn-upload" id="browseBtn">
+                        <span>Select File</span>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M15 12L10 7L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🔍</div>
+                        <h4>AI Detection</h4>
+                        <p>Identifies AI-generated content using advanced pattern analysis</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h4>Instant Analysis</h4>
+                        <p>Real-time processing with comprehensive authenticity scoring</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h4>Multi-Layer Check</h4>
+                        <p>Metadata, noise patterns, edges, and compression analysis</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analysis Section (Hidden Initially) -->
+            <section class="analysis-section" id="analysisSection" style="display: none;">
+                <!-- File Preview -->
+                <div class="file-preview">
+                    <div class="preview-header">
+                        <h3>Document Preview</h3>
+                        <button class="btn-secondary" id="newScanBtn">New Scan</button>
+                    </div>
+                    <div class="preview-content" id="previewContent">
+                        <img id="previewImage" alt="Document preview">
+                        <div class="preview-info">
+                            <p id="fileName"></p>
+                            <p id="fileSize"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div class="loading-state" id="loadingState">
+                    <div class="scanner-animation">
+                        <div class="scan-line"></div>
+                        <div class="scan-grid"></div>
+                    </div>
+                    <p class="loading-text">Analyzing document...</p>
+                    <div class="loading-steps">
+                        <div class="step active">Extracting metadata</div>
+                        <div class="step">Analyzing noise patterns</div>
+                        <div class="step">Checking edge consistency</div>
+                        <div class="step">Detecting compression artifacts</div>
+                        <div class="step">Calculating authenticity score</div>
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div class="results-container" id="resultsContainer" style="display: none;">
+                    <div class="result-header">
+                        <h2>Analysis Complete</h2>
+                        <div class="result-label" id="resultLabel"></div>
+                    </div>
+
+                    <!-- Authenticity Score Meter -->
+                    <div class="score-container">
+                        <div class="score-circle">
+                            <svg class="score-ring" viewBox="0 0 200 200">
+                                <circle class="score-ring-bg" cx="100" cy="100" r="85" />
+                                <circle class="score-ring-progress" cx="100" cy="100" r="85" id="scoreRing" />
+                            </svg>
+                            <div class="score-value">
+                                <span id="scoreNumber">0</span>
+                                <span class="score-percent">%</span>
+                            </div>
+                        </div>
+                        <div class="score-info">
+                            <h3>Authenticity Score</h3>
+                            <p>Confidence Level: <strong id="confidenceLevel">0%</strong></p>
+                        </div>
+                    </div>
+
+                    <!-- Breakdown -->
+                    <div class="breakdown-section">
+                        <h3>Analysis Breakdown</h3>
+                        <div class="breakdown-grid">
+                            <div class="breakdown-item">
+                                <div class="breakdown-header">
+                                    <span>Metadata Anomaly</span>
+                                    <span id="metadataScore">--</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="metadataBar"></div>
+                                </div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="breakdown-header">
+                                    <span>Noise Uniformity</span>
+                                    <span id="noiseScore">--</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="noiseBar"></div>
+                                </div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="breakdown-header">
+                                    <span>Edge Consistency</span>
+                                    <span id="edgeScore">--</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="edgeBar"></div>
+                                </div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="breakdown-header">
+                                    <span>Compression Artifacts</span>
+                                    <span id="compressionScore">--</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="compressionBar"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SynthID Status -->
+                    <div class="synthid-section">
+                        <div class="synthid-header">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"/>
+                                <path d="M2 17L12 22L22 17M2 12L12 17L22 12" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            <h4>Google SynthID Detection</h4>
+                        </div>
+                        <p class="synthid-status" id="synthidStatus">Integration pending - requires API credentials</p>
+                        <p class="synthid-note">This system is designed to support SynthID watermark detection for enhanced AI content verification.</p>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="result-actions">
+                        <button class="btn-primary" id="downloadReportBtn">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M10 2V14M10 14L14 10M10 14L6 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M3 18H17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Download Report
+                        </button>
+                        <button class="btn-secondary" id="analyzeAnotherBtn">Analyze Another</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- History Section -->
+            <section class="history-section" id="historySection">
+                <div class="history-header">
+                    <h3>Recent Scans</h3>
+                    <button class="btn-text" id="clearHistoryBtn">Clear All</button>
+                </div>
+                <div class="history-list" id="historyList">
+                    <p class="history-empty">No scans yet. Upload a document to get started.</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Built with FastAPI + Vanilla JS | Deployed on GitHub Pages + Render</p>
+            <p class="footer-tech">Detection: Noise Analysis • Edge Detection • Metadata Verification • SynthID Ready</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
