@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 import io
 import os
 import numpy as np
+import requests
 from PIL import Image, ImageStat
 from datetime import datetime
 import pypdfium2 as pdfium
