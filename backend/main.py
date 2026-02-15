@@ -211,10 +211,25 @@ async def analyze_document(file: UploadFile = File(...)):
             compression_score
         )
 
-        result["metadata"] = metadata
-        result["analyzed_at"] = datetime.now().isoformat()
+       response = {
+    "score": result["score"],
+    "label": result["label"],
+    "confidence": result["confidence"],
+    "metadata": metadata,
+    "analyzed_at": datetime.now().isoformat(),
+    "breakdown": {
+        "metadata_anomaly": round(metadata_score * 100, 1),
+        "noise_uniformity": round(noise_score * 100, 1),
+        "edge_consistency": round(edge_score * 100, 1),
+        "compression_artifacts": round(compression_score * 100, 1),
+    },
+    "synthid": {
+        "available": False,
+        "message": "SynthID detection not enabled"
+    }
+}
 
-        return JSONResponse(content=result)
+return JSONResponse(content=response)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
