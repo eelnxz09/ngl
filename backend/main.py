@@ -1,6 +1,5 @@
 """
-AI Document Authenticity Scanner - Backend API
-Analyzes documents for authenticity using multiple detection methods
+AI Document Authenticity Scanner - Hybrid AI + Heuristic Backend
 """
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -10,28 +9,28 @@ import io
 import os
 import numpy as np
 import requests
+import base64
 from PIL import Image, ImageStat
 from datetime import datetime
 import pypdfium2 as pdfium
-import imagehash
 
 # ==============================
-# 🔐 ADD YOUR API CREDENTIALS HERE
+# 🔐 YOUR CREDENTIALS
 # ==============================
 API_USER = "301528576"
 API_SECRET = "zWH9kRpV8uZezQqkUnkqx3fRqPcZiAah"
+AI_DETECTOR_URL = "https://api.sightengine.com/1.0/check.json"
 # ==============================
 
 app = FastAPI(
     title="Document Authenticity Scanner API",
-    description="AI-powered document verification and authenticity detection",
-    version="1.0.0"
+    description="Hybrid AI + Heuristic document verification",
+    version="2.0.0"
 )
 
-# CORS (Restrict in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with your frontend domain in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,8 +42,42 @@ class DocumentAnalyzer:
         self.ai_patterns = {
             "noise_threshold": 0.15,
             "edge_variance_threshold": 0.25,
-            "compression_artifacts_threshold": 0.3,
         }
+
+    # -------------------------
+    # AI MODEL DETECTION
+    # -------------------------
+    def analyze_ai_model(self, image: Image.Image):
+    try:
+        buffered = io.BytesIO()
+        image.save(buffered, format="JPEG")
+        buffered.seek(0)
+
+        response = requests.post(
+            "https://api.sightengine.com/1.0/check.json",
+            files={"media": ("image.jpg", buffered, "image/jpeg")},
+            data={
+                "models": "genai",
+                "api_user": "301528576",
+                "api_secret": "zWH9kRpV8uZezQqkUnkqx3fRqPcZiAah"
+            },
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+
+            # Sightengine returns something like:
+            # result["type"]["ai_generated"]
+            ai_probability = result.get("type", {}).get("ai_generated", 0.5)
+
+            return float(ai_probability)
+
+    except Exception:
+        pass
+
+    return 0.5
+ # fallback neutral
 
     # -------------------------
     # Metadata Analysis
@@ -148,59 +181,47 @@ class DocumentAnalyzer:
         return 0.5
 
     # -------------------------
-    # Final Score Calculation
+    # HYBRID SCORING
     # -------------------------
     def calculate_authenticity_score(
         self,
         metadata_score,
         noise_score,
         edge_score,
-        compression_score
+        compression_score,
+        ai_probability
     ):
-        weights = {
-            "metadata": 0.2,
-            "noise": 0.3,
-            "edge": 0.3,
-            "compression": 0.2
-        }
 
-        suspicion_score = (
-            metadata_score * weights["metadata"] +
-            noise_score * weights["noise"] +
-            edge_score * weights["edge"] +
-            compression_score * weights["compression"]
+        heuristic_suspicion = (
+            metadata_score * 0.2 +
+            noise_score * 0.3 +
+            edge_score * 0.3 +
+            compression_score * 0.2
         )
 
-        authenticity_score = (1.0 - suspicion_score) * 100
+        # 60% AI model weight
+        combined_suspicion = (
+            heuristic_suspicion * 0.4 +
+            ai_probability * 0.6
+        )
+
+        authenticity_score = (1 - combined_suspicion) * 100
 
         if authenticity_score >= 75:
             label = "Verified"
-            confidence = min((authenticity_score - 75) / 25, 1.0)
         elif authenticity_score >= 50:
             label = "Suspicious"
-            confidence = 0.7
         else:
             label = "AI Generated"
-            confidence = min((50 - authenticity_score) / 50, 1.0)
 
         return {
             "score": round(authenticity_score, 1),
             "label": label,
-            "confidence": round(confidence, 2)
+            "confidence": round(abs(authenticity_score - 50) / 50, 2)
         }
 
 
 analyzer = DocumentAnalyzer()
-
-
-@app.get("/")
-async def root():
-    return {
-        "status": "online",
-        "service": "Document Authenticity Scanner API",
-        "version": "1.0.0",
-        "timestamp": datetime.now().isoformat()
-    }
 
 
 @app.post("/analyze")
@@ -226,11 +247,10 @@ async def analyze_document(file: UploadFile = File(...)):
             "image/jpg"
         ]:
             pil_image = Image.open(io.BytesIO(contents))
-
         else:
             raise HTTPException(
                 status_code=400,
-                detail="Unsupported file type. Supported: PDF, JPG, PNG, WEBP"
+                detail="Unsupported file type"
             )
 
         if pil_image.mode != "RGB":
@@ -239,47 +259,37 @@ async def analyze_document(file: UploadFile = File(...)):
         metadata, metadata_score = analyzer.analyze_metadata(
             pil_image, file.filename
         )
+
         noise_score = analyzer.analyze_noise_patterns(pil_image)
         edge_score = analyzer.analyze_edge_consistency(pil_image)
         compression_score = analyzer.analyze_compression_artifacts(pil_image)
+
+        # 🔥 AI MODEL CALL
+        ai_probability = analyzer.analyze_ai_model(pil_image)
 
         result = analyzer.calculate_authenticity_score(
             metadata_score,
             noise_score,
             edge_score,
-            compression_score
+            compression_score,
+            ai_probability
         )
 
-        response = {
+        return JSONResponse(content={
             "score": result["score"],
             "label": result["label"],
             "confidence": result["confidence"],
-            "metadata": metadata,
-            "analyzed_at": datetime.now().isoformat(),
-            "breakdown": {
-                "metadata_anomaly": round(metadata_score * 100, 1),
-                "noise_uniformity": round(noise_score * 100, 1),
-                "edge_consistency": round(edge_score * 100, 1),
-                "compression_artifacts": round(compression_score * 100, 1),
-            }
-        }
-
-        return JSONResponse(content=response)
+            "ai_model_probability": round(ai_probability * 100, 1),
+            "analyzed_at": datetime.now().isoformat()
+        })
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Analysis failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "supported_formats": ["PDF", "JPG", "PNG", "WEBP"]
-    }
+    return {"status": "healthy"}
 
 
 if __name__ == "__main__":
