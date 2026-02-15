@@ -1,7 +1,7 @@
 // Configuration
 const CONFIG = {
     // Update this to your deployed backend URL
-    API_URL: 'https://ngl-production-0319.up.railway.app/',
+    API_URL: 'https://ngl-production-2009.up.railway.app/,
     MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
     SUPPORTED_TYPES: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 };
