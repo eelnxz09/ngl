@@ -12,8 +12,14 @@ import numpy as np
 from PIL import Image, ImageStat
 from datetime import datetime
 import pypdfium2 as pdfium
-from typing import Dict, Any
 import imagehash
+
+# ==============================
+# 🔐 ADD YOUR API CREDENTIALS HERE
+# ==============================
+API_USER = "301528576"
+API_SECRET = "zWH9kRpV8uZezQqkUnkqx3fRqPcZiAah"
+# ==============================
 
 app = FastAPI(
     title="Document Authenticity Scanner API",
@@ -21,10 +27,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS configuration for GitHub Pages frontend
+# CORS (Restrict in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For production, replace with your GitHub Pages URL
+    allow_origins=["*"],  # Replace with your frontend domain in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,9 +43,11 @@ class DocumentAnalyzer:
             "noise_threshold": 0.15,
             "edge_variance_threshold": 0.25,
             "compression_artifacts_threshold": 0.3,
-            "synthid_enabled": False
         }
 
+    # -------------------------
+    # Metadata Analysis
+    # -------------------------
     def analyze_metadata(self, image: Image.Image, filename: str):
         metadata = {
             "format": image.format,
@@ -53,13 +61,18 @@ class DocumentAnalyzer:
         metadata["exif_fields"] = len(exif) if exif else 0
 
         anomaly_score = 0.0
+
         if not metadata["has_exif"]:
             anomaly_score += 0.3
+
         if metadata["mode"] == "RGB" and metadata["format"] in ["PNG", "WEBP"]:
             anomaly_score += 0.1
 
         return metadata, min(anomaly_score, 1.0)
 
+    # -------------------------
+    # Noise Analysis
+    # -------------------------
     def analyze_noise_patterns(self, image: Image.Image):
         gray = image.convert("L")
         img_array = np.array(gray)
@@ -67,8 +80,10 @@ class DocumentAnalyzer:
         window_size = 8
         variances = []
 
-        for i in range(0, img_array.shape[0] - window_size, window_size):
-            for j in range(0, img_array.shape[1] - window_size, window_size):
+        h, w = img_array.shape
+
+        for i in range(0, h - window_size, window_size):
+            for j in range(0, w - window_size, window_size):
                 window = img_array[i:i+window_size, j:j+window_size]
                 variances.append(np.var(window))
 
@@ -80,6 +95,9 @@ class DocumentAnalyzer:
 
         return 0.5
 
+    # -------------------------
+    # Edge Analysis
+    # -------------------------
     def analyze_edge_consistency(self, image: Image.Image):
         gray = image.convert("L")
         img_array = np.array(gray)
@@ -103,19 +121,23 @@ class DocumentAnalyzer:
 
     def _convolve2d(self, image: np.ndarray, kernel: np.ndarray):
         output = np.zeros_like(image, dtype=float)
+
         k_height, k_width = kernel.shape
         pad_h, pad_w = k_height // 2, k_width // 2
 
-        for i in range(pad_h, image.shape[0] - pad_h):
-            for j in range(pad_w, image.shape[1] - pad_w):
-                region = image[i-pad_h:i+pad_h+1, j-pad_w:j+pad_w+1]
+        padded = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='edge')
+
+        for i in range(image.shape[0]):
+            for j in range(image.shape[1]):
+                region = padded[i:i+k_height, j:j+k_width]
                 output[i, j] = np.sum(region * kernel)
 
         return output
 
+    # -------------------------
+    # Compression Analysis
+    # -------------------------
     def analyze_compression_artifacts(self, image: Image.Image):
-        imagehash.average_hash(image)
-
         stats = ImageStat.Stat(image)
 
         if len(stats.stddev) >= 3:
@@ -124,7 +146,16 @@ class DocumentAnalyzer:
 
         return 0.5
 
-    def calculate_authenticity_score(self, metadata_score, noise_score, edge_score, compression_score):
+    # -------------------------
+    # Final Score Calculation
+    # -------------------------
+    def calculate_authenticity_score(
+        self,
+        metadata_score,
+        noise_score,
+        edge_score,
+        compression_score
+    ):
         weights = {
             "metadata": 0.2,
             "noise": 0.3,
@@ -187,7 +218,12 @@ async def analyze_document(file: UploadFile = File(...)):
             pil_image = page.render(scale=2).to_pil()
             pdf.close()
 
-        elif file.content_type in ["image/jpeg", "image/png", "image/webp", "image/jpg"]:
+        elif file.content_type in [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "image/jpg"
+        ]:
             pil_image = Image.open(io.BytesIO(contents))
 
         else:
@@ -199,7 +235,9 @@ async def analyze_document(file: UploadFile = File(...)):
         if pil_image.mode != "RGB":
             pil_image = pil_image.convert("RGB")
 
-        metadata, metadata_score = analyzer.analyze_metadata(pil_image, file.filename)
+        metadata, metadata_score = analyzer.analyze_metadata(
+            pil_image, file.filename
+        )
         noise_score = analyzer.analyze_noise_patterns(pil_image)
         edge_score = analyzer.analyze_edge_consistency(pil_image)
         compression_score = analyzer.analyze_compression_artifacts(pil_image)
@@ -211,28 +249,27 @@ async def analyze_document(file: UploadFile = File(...)):
             compression_score
         )
 
-       response = {
-    "score": result["score"],
-    "label": result["label"],
-    "confidence": result["confidence"],
-    "metadata": metadata,
-    "analyzed_at": datetime.now().isoformat(),
-    "breakdown": {
-        "metadata_anomaly": round(metadata_score * 100, 1),
-        "noise_uniformity": round(noise_score * 100, 1),
-        "edge_consistency": round(edge_score * 100, 1),
-        "compression_artifacts": round(compression_score * 100, 1),
-    },
-    "synthid": {
-        "available": False,
-        "message": "SynthID detection not enabled"
-    }
-}
+        response = {
+            "score": result["score"],
+            "label": result["label"],
+            "confidence": result["confidence"],
+            "metadata": metadata,
+            "analyzed_at": datetime.now().isoformat(),
+            "breakdown": {
+                "metadata_anomaly": round(metadata_score * 100, 1),
+                "noise_uniformity": round(noise_score * 100, 1),
+                "edge_consistency": round(edge_score * 100, 1),
+                "compression_artifacts": round(compression_score * 100, 1),
+            }
+        }
 
-return JSONResponse(content=response)
+        return JSONResponse(content=response)
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Analysis failed: {str(e)}"
+        )
 
 
 @app.get("/health")
@@ -240,7 +277,6 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "analyzer_ready": True,
         "supported_formats": ["PDF", "JPG", "PNG", "WEBP"]
     }
 
